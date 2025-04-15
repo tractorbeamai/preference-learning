@@ -53,10 +53,10 @@ Summary (3-4 sentences):
 def update_rules(
     initial_summary, edited_summary, direct_preference, current_rules, api_key
 ):
-    """Updates the rule set based on summary edits and direct preferences using OpenAI."""
+    """Analyzes feedback and returns potential new observations (rules/preferences)."""
     if not api_key:
         st.error("OpenAI API key not provided. Please enter it in the sidebar.")
-        return current_rules  # Return current rules if key is missing
+        return []  # Return empty list if key is missing
 
     # Calculate the difference between summaries
     diff_generator = difflib.unified_diff(
@@ -71,8 +71,9 @@ def update_rules(
     # Handle empty diff
     if not diff.strip() and not direct_preference:
         st.toast("No changes detected in summary and no direct preference provided.")
-        return current_rules  # No changes needed
+        return []  # No new observations
 
+    # Include current rules for context, but LLM shouldn't just return them
     current_rules_string = "\n".join(f"- {rule}" for rule in current_rules)
     preference_string = (
         f"Direct Preference Provided: '{direct_preference}'"
@@ -80,9 +81,11 @@ def update_rules(
         else "No direct preference provided."
     )
 
-    prompt = f"""Analyze the user's feedback to refine a set of rules for summarizing medical records.
+    prompt = f"""Analyze the user's feedback (summary edits and direct preference) compared to the original summary and current rules.
 
-Current Rules:
+Identify potential new rules or preferences suggested by this feedback. Generalize the user's intent.
+
+Current Rules (for context only):
 {current_rules_string}
 
 Original LLM Summary:
@@ -102,80 +105,66 @@ Difference (Unified Diff format):
 
 {preference_string}
 
-Based on the differences in the summaries and the direct preference (if any), update the current rules. Your goal is to generalize the user's implicit and explicit feedback into a new, concise set of rules.
+Based *only* on the user's edits (diff) and direct preference, list the *newly suggested rules or preferences*. 
+Do not simply repeat the current rules unless the feedback strongly reinforces them in a new way.
 
 Instructions:
-1.  Analyze the diff and the direct preference.
-2.  Identify implicit changes or explicit instructions.
-3.  Generalize these into potentially new or modified rules.
-4.  Consolidate, remove redundant/conflicting rules, or delete rules contradicted by the feedback.
-5.  Output the *complete* updated list of rules below.
-6.  Each rule MUST start with 'Rule: ' or 'Preference: '.
-7.  List one rule per line.
+1.  Focus on changes implied by the diff and the explicit preference.
+2.  Generate concise, actionable rule statements.
+3.  Prefix each suggested rule/preference with 'Rule: ' or 'Preference: '.
+4.  List one suggestion per line.
+5.  If no new suggestions are clear, output nothing or a simple 'No new suggestions.'
 
-Updated Rules:
+Suggested New Rules/Preferences:
 """
 
     try:
-        client = OpenAI(api_key=api_key)  # Initialize client locally
+        client = OpenAI(api_key=api_key)
         response = client.chat.completions.create(
-            model="gpt-4",  # Using a more capable model for rule generation might be beneficial
+            model="gpt-4",  # Keep capable model for this reasoning task
             messages=[
                 {
                     "role": "system",
-                    "content": "You are an expert system that refines summarization rules based on user feedback (summary edits and direct preferences). You output only the final, updated list of rules, one per line, prefixed appropriately.",
+                    "content": "You are an expert system analyzing user feedback to suggest new summarization rules/preferences. You only output newly suggested rules, prefixed appropriately, one per line.",
                 },
                 {"role": "user", "content": prompt},
             ],
-            temperature=0.3,
-            max_tokens=300,  # Allow more tokens for potentially longer rule lists
+            temperature=0.4,
+            max_tokens=200,  # Shorter max tokens as we expect fewer outputs
         )
-        raw_updated_rules = response.choices[0].message.content.strip()
+        raw_new_observations = response.choices[0].message.content.strip()
 
-        # Parse the response - expecting one rule per line
-        new_rules = []
-        for line in raw_updated_rules.split("\n"):
-            # Strip leading/trailing whitespace AND leading hyphens/spaces
+        # Parse the response for new observations
+        new_observations = []
+        for line in raw_new_observations.split("\n"):
             cleaned_line = line.strip().lstrip("- ").strip()
             if cleaned_line.startswith("Rule: ") or cleaned_line.startswith(
                 "Preference: "
             ):
-                new_rules.append(cleaned_line)
-            elif cleaned_line:  # Handle potentially malformed lines if necessary
-                # Keep the warning for truly unexpected formats
-                st.warning(
-                    f"LLM produced rule in unexpected format (after cleaning): '{cleaned_line}'"
-                )
+                new_observations.append(cleaned_line)
+            # Ignore lines like 'No new suggestions.' or empty lines
 
-        if not new_rules:
-            st.warning("LLM did not return any valid rules. Keeping existing rules.")
-            return current_rules
-
-        unique_new_rules = list(dict.fromkeys(new_rules))
-
-        added_rules = [r for r in unique_new_rules if r not in current_rules]
-        removed_rules = [r for r in current_rules if r not in unique_new_rules]
-
-        if added_rules or removed_rules:
-            st.success(
-                f"Rules updated! Added: {len(added_rules)}, Removed: {len(removed_rules)}."
+        if new_observations:
+            st.toast(
+                f"Identified {len(new_observations)} potential observation(s).",
+                icon="👀",
             )
         else:
-            st.success("Rules analyzed, no changes needed.")
+            st.toast("No new observations identified from feedback.")
 
-        return unique_new_rules
+        return new_observations
 
     except Exception as e:
-        st.error(f"Error updating rules via OpenAI: {e}")
-        st.warning("Could not update rules. Keeping existing rules.")
-        return current_rules
+        st.error(f"Error analyzing feedback via OpenAI: {e}")
+        st.warning("Could not analyze feedback.")
+        return []  # Return empty list on error
 
 
 # --- Streamlit App Layout ---
 
 st.set_page_config(layout="wide", page_title="Tractorbeam Preference Learning")
 
-# Sidebar for API Key
+# Sidebar for API Key and Configuration
 st.sidebar.header("Configuration")
 api_key_input = st.sidebar.text_input(
     "Enter your OpenAI API Key",
@@ -184,23 +173,39 @@ api_key_input = st.sidebar.text_input(
     help="Get your API key from https://platform.openai.com/account/api-keys",
 )
 
+# Learning Rate Selector
+learning_rate_options = ["Slow", "Normal", "Fast"]
+learning_rate = st.sidebar.selectbox(
+    "Learning Rate (Observations to Rule)",
+    options=learning_rate_options,
+    index=1,  # Default to Normal
+    key="learning_rate",
+    help="How many times an observation must appear before becoming a rule (Slow=5, Normal=3, Fast=2).",
+)
+
 st.title("🩺 Tractorbeam: Preference Learning Prototype")
 st.caption(
     "Generate a fake medical record, summarize it, edit the summary, add preferences, and watch the 'learned' rules evolve."
 )
 
-# Initialize session state
+# Initialize session state (if not already done)
 if "rules" not in st.session_state:
     st.session_state.rules = ["Rule: Be concise.", "Rule: Focus on actionable items."]
+if "observations" not in st.session_state:
+    # Store observations as {observation_text: count}
+    st.session_state.observations = {}
 if "fake_record" not in st.session_state:
     st.session_state.fake_record = generate_fake_medical_record()
 if "initial_summary" not in st.session_state:
     st.session_state.initial_summary = ""
 if "edited_summary" not in st.session_state:
     st.session_state.edited_summary = ""
-# Ensure openai_api_key is initialized if not present
 if "openai_api_key" not in st.session_state:
     st.session_state.openai_api_key = ""
+# Ensure learning_rate is initialized from selectbox
+if "learning_rate" not in st.session_state:
+    st.session_state.learning_rate = "Normal"  # Match default index
+
 
 # Define columns
 col1, col2 = st.columns([2, 1])  # Left column wider
@@ -278,16 +283,55 @@ with col1:
                 st.session_state.edited_summary = edited_summary_input
                 direct_preference = st.session_state.get("direct_preference", "")
 
-                with st.spinner("Analyzing feedback and updating rules via OpenAI..."):
-                    updated_rules = update_rules(
+                with st.spinner("Analyzing feedback and suggesting observations..."):
+                    # This now returns potential new observations
+                    new_observations = update_rules(
                         st.session_state.initial_summary,
                         st.session_state.edited_summary,
                         direct_preference,
-                        st.session_state.rules,
-                        current_api_key,  # Pass key to function
+                        st.session_state.rules,  # Pass current rules for context
+                        current_api_key,
                     )
-                    st.session_state.rules = updated_rules
-                    st.rerun()
+
+                # Define learning rate thresholds
+                thresholds = {"Slow": 5, "Normal": 3, "Fast": 2}
+                threshold = thresholds.get(
+                    st.session_state.learning_rate, 3
+                )  # Default to Normal
+
+                promoted_count = 0
+                if new_observations:
+                    with st.spinner(
+                        f"Processing {len(new_observations)} observation(s)..."
+                    ):
+                        # Update observation counts and promote if threshold met
+                        for obs in new_observations:
+                            # Increment count
+                            current_count = st.session_state.observations.get(obs, 0)
+                            current_count += 1
+                            st.session_state.observations[obs] = current_count
+                            st.toast(
+                                f'Observation updated: "{obs[:30]}..." (Count: {current_count})',
+                                icon="📊",
+                            )
+
+                            # Check for promotion
+                            if current_count >= threshold:
+                                if obs not in st.session_state.rules:
+                                    st.session_state.rules.append(obs)
+                                    promoted_count += 1
+                                    st.toast(
+                                        f'Observation promoted to rule: "{obs[:30]}..."',
+                                        icon="🏆",
+                                    )
+                                    # Optional: Remove from observations once promoted?
+                                    # del st.session_state.observations[obs]
+
+                if promoted_count > 0:
+                    st.success(f"{promoted_count} observation(s) promoted to rules!")
+                # No explicit success message if only observations were updated
+
+                st.rerun()  # Rerun to update UI displays
 
 
 # --- Right Column: Rule Management ---
@@ -336,6 +380,29 @@ with col2:
         if len(rules_to_keep) != len(st.session_state.rules):
             st.session_state.rules = rules_to_keep
             st.rerun()
+
+    st.divider()  # Add a visual separator
+
+    st.subheader("Observation Log")
+    if not st.session_state.observations:
+        st.info("No observations recorded yet. Edit summaries or add preferences.")
+    else:
+        # Sort observations by count descending for clarity
+        sorted_observations = sorted(
+            st.session_state.observations.items(),
+            key=lambda item: item[1],
+            reverse=True,
+        )
+        for obs, count in sorted_observations:
+            # Strip prefix for display
+            display_obs = obs
+            if display_obs.startswith("Rule: "):
+                display_obs = display_obs[len("Rule: ") :]
+            elif display_obs.startswith("Preference: "):
+                display_obs = display_obs[len("Preference: ") :]
+
+            st.text(f"Count: {count} | {display_obs}")
+            # Optional: Add delete buttons for observations too?
 
 
 # --- Footer/Debug Info (Optional) ---
