@@ -2,13 +2,9 @@ import difflib
 import random
 
 import streamlit as st
-from dotenv import load_dotenv
 from openai import OpenAI
 
 from fake_medical_record_generator import generate_fake_medical_record
-
-# Load environment variables (useful for API keys)
-load_dotenv()
 
 
 # --- LLM Interaction Functions ---
