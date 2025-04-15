@@ -219,8 +219,11 @@ st.caption(
 if "rules" not in st.session_state:
     st.session_state.rules = ["Rule: Be concise.", "Rule: Focus on actionable items."]
 if "observations" not in st.session_state:
-    # Store observations as {observation_text: count}
+    # Store observations as {canonical_observation_text: count}
     st.session_state.observations = {}
+if "canonical_map" not in st.session_state:
+    # Stores {normalized_observation: canonical_observation_text}
+    st.session_state.canonical_map = {}
 if "fake_record" not in st.session_state:
     st.session_state.fake_record = generate_fake_medical_record()
 if "initial_summary" not in st.session_state:
