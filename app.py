@@ -395,6 +395,12 @@ with col1:
 # --- Right Column: Rule Management ---
 with col2:
     st.subheader("Learned Rules")
+    # Calculate the current threshold for the descriptive text
+    thresholds = {"Slow": 5, "Normal": 3, "Fast": 2}
+    current_threshold = thresholds.get(
+        st.session_state.get("learning_rate", "Normal"), 3
+    )
+
     if not st.session_state.rules:
         st.info("No rules learned yet. Edit summaries or add preferences.")
     else:
@@ -402,45 +408,36 @@ with col2:
         for i in range(len(st.session_state.rules)):
             if i < len(st.session_state.rules):
                 rule = st.session_state.rules[i]
-
-                # Create a container for the card effect
                 with st.container(border=True):
-                    rule_col, button_col = st.columns(
-                        [0.85, 0.15]
-                    )  # Adjust ratio for button
-
+                    rule_col, button_col = st.columns([0.85, 0.15])
                     with rule_col:
-                        # Strip the prefix for display
                         display_rule = rule
                         if display_rule.startswith("Rule: "):
                             display_rule = display_rule[len("Rule: ") :]
                         elif display_rule.startswith("Preference: "):
                             display_rule = display_rule[len("Preference: ") :]
-                        st.markdown(
-                            f"{display_rule}"
-                        )  # Use markdown for potentially better formatting
-
+                        st.markdown(f"{display_rule}")
                     with button_col:
-                        # Delete button remains the same
                         if st.button(
                             "🗑️",
-                            key=f"delete_rule_{i}_{rule}",  # Key uses original rule with prefix for uniqueness
-                            help=f"Delete rule: '{rule}'",  # Help text shows original rule
+                            key=f"delete_rule_{i}_{rule}",
+                            help=f"Delete rule: '{rule}'",
                         ):
                             st.toast(f"Rule '{rule}' deleted.")
                         else:
-                            rules_to_keep.append(
-                                rule
-                            )  # Keep the original rule with prefix in state
+                            rules_to_keep.append(rule)
             else:
                 break
-
         if len(rules_to_keep) != len(st.session_state.rules):
             st.session_state.rules = rules_to_keep
             st.rerun()
 
-    st.divider()  # Add a visual separator
+    # Add the descriptive caption here
+    st.caption(
+        f"Rules are automatically promoted from the Observation Log below when an observation's count reaches the threshold set by the Learning Rate (currently: {current_threshold})."
+    )
 
+    st.divider()  # Add a visual separator
     st.subheader("Observation Log")
     if not st.session_state.observations:
         st.info("No observations recorded yet. Edit summaries or add preferences.")
