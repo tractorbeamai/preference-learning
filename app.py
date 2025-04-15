@@ -35,7 +35,7 @@ def get_llm_summary(record, rules, api_key):
         rule_string = "\n".join(f"- {rule}" for rule in rules)
         prompt = f"""Please summarize the following fake medical record in exactly 3-4 concise sentences.
 
-Follow these rules/preferences when generating the summary:
+Follow these rules/preferences carefully when generating the summary. These rules reflect the specific preferences of THIS user:
 {rule_string}
 
 Medical Record:
@@ -51,7 +51,7 @@ Summary (3-4 sentences):
             messages=[
                 {
                     "role": "system",
-                    "content": "You are a helpful assistant that summarizes medical records according to user preferences.",
+                    "content": "You are a helpful assistant that summarizes medical records according to the specific preferences and rules provided by the current user.",
                 },
                 {"role": "user", "content": prompt},
             ],
@@ -113,7 +113,7 @@ def update_rules(
         "type": "function",
         "function": {
             "name": "extract_observations",
-            "description": "Extracts relevant observation strings (either reinforced existing ones or newly formulated ones) based on user feedback (summary diff and direct preference) and existing context (rules, observations).",
+            "description": "Extracts observation strings reflecting this specific user's preferences (reinforced or new) based on their feedback and context. Capture specific patterns, like preferred shorthand or signatures, not just general summarization principles.",
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -121,9 +121,9 @@ def update_rules(
                         "type": "array",
                         "items": {
                             "type": "string",
-                            "description": "A single observation string. If reinforcing an existing theme, use the exact canonical string from the 'Current Observations Log'. If new, formulate a concise string prefixed with 'Rule: ' or 'Preference: '.",
+                            "description": "A single observation string reflecting a specific user preference. If reinforcing an existing theme, use the exact canonical string. If new, formulate a concise string (e.g., 'Rule: Always end with signature X', 'Preference: Use shorthand Y for Z') prefixed with 'Rule: ' or 'Preference: '.",
                         },
-                        "description": "A list of observation strings identified as relevant based on the user feedback and context.",
+                        "description": "A list of observation strings identified as relevant based on the user feedback and context. Focus on capturing the user's specific preferences.",
                     }
                 },
                 "required": ["relevant_observations"],
@@ -132,12 +132,14 @@ def update_rules(
     }
 
     # Simplified prompt focusing on the task and context, letting the tool handle structure
-    prompt = f"""Analyze the user's feedback (summary edits and direct preference) in the context of existing rules and observations. Identify existing observation themes that are reinforced OR genuinely new observation themes suggested by the feedback. Use the 'extract_observations' tool to output the results.
+    prompt = f"""Analyze the user's feedback (summary edits and direct preference) in the context of their existing rules and observations. The goal is to learn *this specific user's* preferences, even if they are idiosyncratic (like specific signatures, formatting, or shorthand).
 
-Current Rules (for context):
+Identify existing observation themes that are reinforced OR genuinely new observation themes suggested by the feedback. Use the 'extract_observations' tool to output the results.
+
+Current User's Rules (for context):
 {current_rules_string}
 
-Current Observations Log (Canonical String: Count):
+Current User's Observations Log (Canonical String: Count):
 {observations_string}
 
 Original LLM Summary:
@@ -145,7 +147,7 @@ Original LLM Summary:
 {initial_summary}
 ```
 
-User-Edited Summary:
+User-Edited Summary (Reflects their preferences):
 ```
 {edited_summary}
 ```
@@ -157,17 +159,20 @@ Difference (Unified Diff format):
 
 {preference_string}
 
-Use the 'extract_observations' tool to list all relevant observation strings. If reinforcing an existing theme, provide the *exact canonical observation string* from the 'Current Observations Log'. If identifying a new theme, formulate a concise observation string prefixed with 'Rule: ' or 'Preference: '. If no observations are identified, call the tool with an empty list.
+Use the 'extract_observations' tool to list all relevant observation strings reflecting this user's specific preferences.
+- If reinforcing an existing theme, provide the *exact canonical observation string* from the 'Current User's Observations Log'.
+- If identifying a new theme, formulate a concise observation string reflecting the specific preference (e.g., 'Rule: Add signature XYZ', 'Preference: Use TLA for Three Letter Acronym') prefixed with 'Rule: ' or 'Preference: '. Do NOT make the observations overly general.
+- If no observations are identified, call the tool with an empty list.
 """
 
     try:
         client = OpenAI(api_key=api_key)
         response = client.chat.completions.create(
-            model=MODEL,  # Tool calling generally works better with GPT-4
+            model=MODEL,
             messages=[
                 {
                     "role": "system",
-                    "content": "You are an expert system analyzing user feedback to identify reinforced or new observation themes for summarizing text. You MUST use the provided 'extract_observations' tool to return your findings.",
+                    "content": "You are an expert system analyzing user feedback to identify and learn *specific, potentially idiosyncratic* user preferences for summarizing text. You MUST use the provided 'extract_observations' tool to return your findings, focusing on capturing the user's unique style and requirements.",
                 },
                 {"role": "user", "content": prompt},
             ],
@@ -217,11 +222,13 @@ Use the 'extract_observations' tool to list all relevant observation strings. If
         # Provide feedback based on processed observations
         if relevant_observations:
             st.toast(
-                f"LLM identified {len(relevant_observations)} relevant observation(s) via tool.",
-                icon="🛠️",  # Updated icon
+                f"LLM identified {len(relevant_observations)} relevant preference observation(s) via tool.",
+                icon="🛠️",
             )
         elif message.tool_calls:  # Tool was called but list was empty or parsing failed
-            st.toast("LLM tool called, but no relevant observations identified.")
+            st.toast(
+                "LLM tool called, but no specific preference observations identified."
+            )
         else:  # Tool wasn't called (shouldn't happen with tool_choice="required")
             st.warning("LLM did not use the expected tool to extract observations.")
 
