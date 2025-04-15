@@ -1,10 +1,13 @@
 import difflib
+import json
 import random
 
 import streamlit as st
 from openai import OpenAI
 
 from fake_medical_record_generator import generate_fake_medical_record
+
+MODEL = "gpt-4.1-mini"
 
 
 # --- Add Helper Function near top ---
@@ -44,7 +47,7 @@ Summary (3-4 sentences):
 """
 
         response = client.chat.completions.create(
-            model="gpt-3.5-turbo",  # Or use "gpt-4" if preferred
+            model=MODEL,
             messages=[
                 {
                     "role": "system",
@@ -71,7 +74,7 @@ def update_rules(
     current_observations,
     api_key,
 ):
-    """Analyzes feedback against existing observations/rules and returns relevant observation strings."""
+    """Analyzes feedback against existing observations/rules using OpenAI Tool Calling."""
     if not api_key:
         st.error("OpenAI API key not provided. Please enter it in the sidebar.")
         return []
@@ -89,9 +92,9 @@ def update_rules(
     # Handle empty diff
     if not diff.strip() and not direct_preference:
         st.toast("No changes detected in summary and no direct preference provided.")
-        return []  # No new observations
+        return []
 
-    # Include current rules for context, but LLM shouldn't just return them
+    # Include current rules for context
     current_rules_string = "\n".join(f"- {rule}" for rule in current_rules)
     preference_string = (
         f"Direct Preference Provided: '{direct_preference}'"
@@ -105,9 +108,31 @@ def update_rules(
     if not observations_string:
         observations_string = "None yet."
 
-    prompt = f"""Analyze the user's feedback (summary edits and direct preference) in the context of existing rules and observations.
+    # Define the tool schema
+    observation_tool_schema = {
+        "type": "function",
+        "function": {
+            "name": "extract_observations",
+            "description": "Extracts relevant observation strings (either reinforced existing ones or newly formulated ones) based on user feedback (summary diff and direct preference) and existing context (rules, observations).",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "relevant_observations": {
+                        "type": "array",
+                        "items": {
+                            "type": "string",
+                            "description": "A single observation string. If reinforcing an existing theme, use the exact canonical string from the 'Current Observations Log'. If new, formulate a concise string prefixed with 'Rule: ' or 'Preference: '.",
+                        },
+                        "description": "A list of observation strings identified as relevant based on the user feedback and context.",
+                    }
+                },
+                "required": ["relevant_observations"],
+            },
+        },
+    }
 
-Your goal is to identify which existing observation themes are reinforced OR identify genuinely new observation themes suggested by the feedback.
+    # Simplified prompt focusing on the task and context, letting the tool handle structure
+    prompt = f"""Analyze the user's feedback (summary edits and direct preference) in the context of existing rules and observations. Identify existing observation themes that are reinforced OR genuinely new observation themes suggested by the feedback. Use the 'extract_observations' tool to output the results.
 
 Current Rules (for context):
 {current_rules_string}
@@ -132,57 +157,78 @@ Difference (Unified Diff format):
 
 {preference_string}
 
-Instructions:
-1. Compare the new feedback (diff, direct preference) against the Current Observations Log and Current Rules.
-2. Determine if the feedback reinforces an existing observation theme.
-3. Determine if the feedback suggests a genuinely new observation theme not already captured.
-4. Output *only* the relevant observation strings below, one per line.
-5. **Crucially**: If reinforcing an existing theme, output the *exact canonical observation string* from the 'Current Observations Log' provided above.
-6. If identifying a new theme, formulate a concise observation string prefixed with 'Rule: ' or 'Preference: '.
-7. Do NOT output rules from 'Current Rules' unless the feedback specifically suggests modifying or reinforcing them as an observation.
-8. If no existing themes are reinforced and no new themes are identified, output nothing.
-
-Relevant Observations (Reinforced or New):
+Use the 'extract_observations' tool to list all relevant observation strings. If reinforcing an existing theme, provide the *exact canonical observation string* from the 'Current Observations Log'. If identifying a new theme, formulate a concise observation string prefixed with 'Rule: ' or 'Preference: '. If no observations are identified, call the tool with an empty list.
 """
 
     try:
         client = OpenAI(api_key=api_key)
         response = client.chat.completions.create(
-            model="gpt-4",  # Keep capable model
+            model=MODEL,  # Tool calling generally works better with GPT-4
             messages=[
                 {
                     "role": "system",
-                    "content": "You are an expert system analyzing user feedback to identify reinforced or new observation themes for summarizing text. You compare feedback against existing observations and output only the relevant canonical or new observation strings, one per line.",
+                    "content": "You are an expert system analyzing user feedback to identify reinforced or new observation themes for summarizing text. You MUST use the provided 'extract_observations' tool to return your findings.",
                 },
                 {"role": "user", "content": prompt},
             ],
-            temperature=0.2,  # Lower temperature for more deterministic matching
-            max_tokens=200,
+            tools=[observation_tool_schema],
+            tool_choice={
+                "type": "function",
+                "function": {"name": "extract_observations"},
+            },  # Force tool use
+            temperature=0.1,  # Lower temperature for more structured output
+            max_tokens=500,  # Adjust if needed, tool calls can consume tokens
         )
-        raw_relevant_observations = response.choices[0].message.content.strip()
 
-        # Parse the response for new observations
-        relevant_observations = []
-        for line in raw_relevant_observations.split("\n"):
-            cleaned_line = line.strip().lstrip("- ").strip()
-            if cleaned_line.startswith("Rule: ") or cleaned_line.startswith(
-                "Preference: "
-            ):
-                relevant_observations.append(cleaned_line)
-            # Ignore lines like 'No new suggestions.' or empty lines
+        message = response.choices[0].message
+        relevant_observations = []  # Default to empty list
 
+        # Check if the model decided to use the tool
+        if message.tool_calls:
+            tool_call = message.tool_calls[0]
+            if tool_call.function.name == "extract_observations":
+                try:
+                    # Parse the JSON arguments string from the tool call
+                    arguments = json.loads(tool_call.function.arguments)
+                    # Extract the list of observations, handle case where key might be missing
+                    relevant_observations = arguments.get("relevant_observations", [])
+
+                    # Basic validation (ensure it's a list of strings)
+                    if not isinstance(relevant_observations, list) or not all(
+                        isinstance(item, str) for item in relevant_observations
+                    ):
+                        st.warning(
+                            "LLM tool call returned unexpected format for observations. Treating as empty."
+                        )
+                        relevant_observations = []
+                    else:
+                        # Clean up whitespace just in case
+                        relevant_observations = [
+                            obs.strip() for obs in relevant_observations if obs.strip()
+                        ]
+
+                except json.JSONDecodeError:
+                    st.error("Error decoding JSON arguments from LLM tool call.")
+                    relevant_observations = []  # Treat as error/empty
+                except Exception as e:
+                    st.error(f"Error processing LLM tool call arguments: {e}")
+                    relevant_observations = []  # Treat as error/empty
+
+        # Provide feedback based on processed observations
         if relevant_observations:
             st.toast(
-                f"LLM identified {len(relevant_observations)} relevant observation(s).",
-                icon="🧠",
+                f"LLM identified {len(relevant_observations)} relevant observation(s) via tool.",
+                icon="🛠️",  # Updated icon
             )
-        else:
-            st.toast("LLM identified no relevant observations from feedback.")
+        elif message.tool_calls:  # Tool was called but list was empty or parsing failed
+            st.toast("LLM tool called, but no relevant observations identified.")
+        else:  # Tool wasn't called (shouldn't happen with tool_choice="required")
+            st.warning("LLM did not use the expected tool to extract observations.")
 
         return relevant_observations  # Return list of strings identified by LLM
 
     except Exception as e:
-        st.error(f"Error analyzing feedback via OpenAI: {e}")
+        st.error(f"Error during OpenAI API call or processing: {e}")
         st.warning("Could not analyze feedback.")
         return []
 
