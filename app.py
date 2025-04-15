@@ -7,6 +7,19 @@ from openai import OpenAI
 from fake_medical_record_generator import generate_fake_medical_record
 
 
+# --- Add Helper Function near top ---
+def normalize_observation(text):
+    """Simple normalization: remove prefix, lowercase, strip punctuation/whitespace."""
+    text = text.lower().strip()
+    if text.startswith("rule:"):
+        text = text[len("rule:") :].strip()
+    if text.startswith("preference:"):
+        text = text[len("preference:") :].strip()
+    text = text.rstrip(".!?").strip()
+    # Add more normalization if needed (e.g., removing articles)
+    return text
+
+
 # --- LLM Interaction Functions ---
 def get_llm_summary(record, rules, api_key):
     """Generates a summary using the OpenAI API."""
@@ -51,12 +64,17 @@ Summary (3-4 sentences):
 
 
 def update_rules(
-    initial_summary, edited_summary, direct_preference, current_rules, api_key
+    initial_summary,
+    edited_summary,
+    direct_preference,
+    current_rules,
+    current_observations,
+    api_key,
 ):
-    """Analyzes feedback and returns potential new observations (rules/preferences)."""
+    """Analyzes feedback against existing observations/rules and returns relevant observation strings."""
     if not api_key:
         st.error("OpenAI API key not provided. Please enter it in the sidebar.")
-        return []  # Return empty list if key is missing
+        return []
 
     # Calculate the difference between summaries
     diff_generator = difflib.unified_diff(
@@ -80,13 +98,22 @@ def update_rules(
         if direct_preference
         else "No direct preference provided."
     )
+    # Format observations with counts for context
+    observations_string = "\n".join(
+        f"- {obs} (Count: {count})" for obs, count in current_observations.items()
+    )
+    if not observations_string:
+        observations_string = "None yet."
 
-    prompt = f"""Analyze the user's feedback (summary edits and direct preference) compared to the original summary and current rules.
+    prompt = f"""Analyze the user's feedback (summary edits and direct preference) in the context of existing rules and observations.
 
-Identify potential new rules or preferences suggested by this feedback. Generalize the user's intent.
+Your goal is to identify which existing observation themes are reinforced OR identify genuinely new observation themes suggested by the feedback.
 
-Current Rules (for context only):
+Current Rules (for context):
 {current_rules_string}
+
+Current Observations Log (Canonical String: Count):
+{observations_string}
 
 Original LLM Summary:
 ```
@@ -105,59 +132,59 @@ Difference (Unified Diff format):
 
 {preference_string}
 
-Based *only* on the user's edits (diff) and direct preference, list the *newly suggested rules or preferences*. 
-Do not simply repeat the current rules unless the feedback strongly reinforces them in a new way.
-
 Instructions:
-1.  Focus on changes implied by the diff and the explicit preference.
-2.  Generate concise, actionable rule statements.
-3.  Prefix each suggested rule/preference with 'Rule: ' or 'Preference: '.
-4.  List one suggestion per line.
-5.  If no new suggestions are clear, output nothing or a simple 'No new suggestions.'
+1. Compare the new feedback (diff, direct preference) against the Current Observations Log and Current Rules.
+2. Determine if the feedback reinforces an existing observation theme.
+3. Determine if the feedback suggests a genuinely new observation theme not already captured.
+4. Output *only* the relevant observation strings below, one per line.
+5. **Crucially**: If reinforcing an existing theme, output the *exact canonical observation string* from the 'Current Observations Log' provided above.
+6. If identifying a new theme, formulate a concise observation string prefixed with 'Rule: ' or 'Preference: '.
+7. Do NOT output rules from 'Current Rules' unless the feedback specifically suggests modifying or reinforcing them as an observation.
+8. If no existing themes are reinforced and no new themes are identified, output nothing.
 
-Suggested New Rules/Preferences:
+Relevant Observations (Reinforced or New):
 """
 
     try:
         client = OpenAI(api_key=api_key)
         response = client.chat.completions.create(
-            model="gpt-4",  # Keep capable model for this reasoning task
+            model="gpt-4",  # Keep capable model
             messages=[
                 {
                     "role": "system",
-                    "content": "You are an expert system analyzing user feedback to suggest new summarization rules/preferences. You only output newly suggested rules, prefixed appropriately, one per line.",
+                    "content": "You are an expert system analyzing user feedback to identify reinforced or new observation themes for summarizing text. You compare feedback against existing observations and output only the relevant canonical or new observation strings, one per line.",
                 },
                 {"role": "user", "content": prompt},
             ],
-            temperature=0.4,
-            max_tokens=200,  # Shorter max tokens as we expect fewer outputs
+            temperature=0.2,  # Lower temperature for more deterministic matching
+            max_tokens=200,
         )
-        raw_new_observations = response.choices[0].message.content.strip()
+        raw_relevant_observations = response.choices[0].message.content.strip()
 
         # Parse the response for new observations
-        new_observations = []
-        for line in raw_new_observations.split("\n"):
+        relevant_observations = []
+        for line in raw_relevant_observations.split("\n"):
             cleaned_line = line.strip().lstrip("- ").strip()
             if cleaned_line.startswith("Rule: ") or cleaned_line.startswith(
                 "Preference: "
             ):
-                new_observations.append(cleaned_line)
+                relevant_observations.append(cleaned_line)
             # Ignore lines like 'No new suggestions.' or empty lines
 
-        if new_observations:
+        if relevant_observations:
             st.toast(
-                f"Identified {len(new_observations)} potential observation(s).",
-                icon="👀",
+                f"LLM identified {len(relevant_observations)} relevant observation(s).",
+                icon="🧠",
             )
         else:
-            st.toast("No new observations identified from feedback.")
+            st.toast("LLM identified no relevant observations from feedback.")
 
-        return new_observations
+        return relevant_observations  # Return list of strings identified by LLM
 
     except Exception as e:
         st.error(f"Error analyzing feedback via OpenAI: {e}")
         st.warning("Could not analyze feedback.")
-        return []  # Return empty list on error
+        return []
 
 
 # --- Streamlit App Layout ---
@@ -285,11 +312,12 @@ with col1:
 
                 with st.spinner("Analyzing feedback and suggesting observations..."):
                     # This now returns potential new observations
-                    new_observations = update_rules(
+                    relevant_observations = update_rules(
                         st.session_state.initial_summary,
                         st.session_state.edited_summary,
                         direct_preference,
                         st.session_state.rules,  # Pass current rules for context
+                        st.session_state.observations,  # Pass current observations
                         current_api_key,
                     )
 
@@ -300,36 +328,63 @@ with col1:
                 )  # Default to Normal
 
                 promoted_count = 0
-                if new_observations:
+                # Process the observations returned by the LLM
+                if relevant_observations:
                     with st.spinner(
-                        f"Processing {len(new_observations)} observation(s)..."
+                        f"Processing {len(relevant_observations)} observation(s)..."
                     ):
-                        # Update observation counts and promote if threshold met
-                        for obs in new_observations:
-                            # Increment count
-                            current_count = st.session_state.observations.get(obs, 0)
-                            current_count += 1
-                            st.session_state.observations[obs] = current_count
-                            st.toast(
-                                f'Observation updated: "{obs[:30]}..." (Count: {current_count})',
-                                icon="📊",
-                            )
+                        for obs in relevant_observations:
+                            normalized_obs = normalize_observation(obs)
 
-                            # Check for promotion
+                            # Check if this normalized theme exists
+                            if normalized_obs in st.session_state.canonical_map:
+                                canonical_key = st.session_state.canonical_map[
+                                    normalized_obs
+                                ]
+                                # Increment count for existing canonical key
+                                current_count = (
+                                    st.session_state.observations.get(canonical_key, 0)
+                                    + 1
+                                )
+                                st.session_state.observations[canonical_key] = (
+                                    current_count
+                                )
+                                st.toast(
+                                    f'Observation updated: "{canonical_key[:30]}..." (Count: {current_count})',
+                                    icon="📊",
+                                )
+                            else:
+                                # It's a new theme (use the LLM's first version as canonical)
+                                canonical_key = obs
+                                current_count = 1
+                                st.session_state.observations[canonical_key] = (
+                                    current_count
+                                )
+                                st.session_state.canonical_map[normalized_obs] = (
+                                    canonical_key  # Map normalized to canonical
+                                )
+                                st.toast(
+                                    f'New observation added: "{canonical_key[:30]}..." (Count: {current_count})',
+                                    icon="✨",
+                                )
+
+                            # Check for promotion using the canonical key and its count
                             if current_count >= threshold:
-                                if obs not in st.session_state.rules:
-                                    st.session_state.rules.append(obs)
+                                if canonical_key not in st.session_state.rules:
+                                    st.session_state.rules.append(canonical_key)
                                     promoted_count += 1
                                     st.toast(
-                                        f'Observation promoted to rule: "{obs[:30]}..."',
+                                        f'Observation promoted to rule: "{canonical_key[:30]}..."',
                                         icon="🏆",
                                     )
-                                    # Optional: Remove from observations once promoted?
-                                    # del st.session_state.observations[obs]
+                                    # Optional: Remove from observations/map once promoted?
+                                    # if canonical_key in st.session_state.observations:
+                                    #     del st.session_state.observations[canonical_key]
+                                    # if normalized_obs in st.session_state.canonical_map:
+                                    #     del st.session_state.canonical_map[normalized_obs]
 
                 if promoted_count > 0:
                     st.success(f"{promoted_count} observation(s) promoted to rules!")
-                # No explicit success message if only observations were updated
 
                 st.rerun()  # Rerun to update UI displays
 
