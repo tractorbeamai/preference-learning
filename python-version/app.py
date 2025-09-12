@@ -4,6 +4,7 @@ import random
 
 import streamlit as st
 from openai import OpenAI
+from streamlit_extras.row import row
 
 from fake_medical_record_generator import generate_fake_medical_record
 
@@ -295,7 +296,14 @@ col1, col2 = st.columns([2, 1])  # Left column wider
 
 # --- Left Column: Interaction Area ---
 with col1:
-    st.subheader("Fake Medical Record")
+    row2 = row(2, vertical_align="bottom")
+    row2.subheader("Fake Medical Record")
+    if row2.button("Regenerate Medical Record", align="right"):
+        st.session_state.fake_record = generate_fake_medical_record()
+        st.session_state.initial_summary = ""  # Clear summary when record changes
+        st.session_state.edited_summary = ""
+        st.rerun()
+
     record_display_area = st.text_area(
         "Generated Record",
         st.session_state.fake_record,
@@ -303,13 +311,7 @@ with col1:
         key="record_display",
     )
 
-    if st.button("🔄 Regenerate Medical Record"):
-        st.session_state.fake_record = generate_fake_medical_record()
-        st.session_state.initial_summary = ""  # Clear summary when record changes
-        st.session_state.edited_summary = ""
-        st.rerun()
-
-    if st.button("📝 Summarize Record", type="primary"):
+    if st.button("Summarize Record", type="primary"):
         if st.session_state.fake_record:
             # Retrieve API key from session state
             current_api_key = st.session_state.openai_api_key
@@ -355,7 +357,7 @@ with col1:
         "Add a preference (e.g., 'Always include allergies')", key="direct_preference"
     )
 
-    if st.button("💾 Save Summary & Preference"):
+    if st.button("Save Summary & Preference"):
         if not st.session_state.initial_summary:
             st.warning("Please generate a summary before saving.")
         else:
@@ -461,24 +463,23 @@ with col2:
         for i in range(len(st.session_state.rules)):
             if i < len(st.session_state.rules):
                 rule = st.session_state.rules[i]
-                with st.container(border=True):
-                    rule_col, button_col = st.columns([0.85, 0.15])
-                    with rule_col:
-                        display_rule = rule
-                        if display_rule.startswith("Rule: "):
-                            display_rule = display_rule[len("Rule: ") :]
-                        elif display_rule.startswith("Preference: "):
-                            display_rule = display_rule[len("Preference: ") :]
-                        st.markdown(f"{display_rule}")
-                    with button_col:
-                        if st.button(
-                            "🗑️",
-                            key=f"delete_rule_{i}_{rule}",
-                            help=f"Delete rule: '{rule}'",
-                        ):
-                            st.toast(f"Rule '{rule}' deleted.")
-                        else:
-                            rules_to_keep.append(rule)
+                rule_col, button_col = st.columns([0.85, 0.15])
+                with rule_col:
+                    display_rule = rule
+                    if display_rule.startswith("Rule: "):
+                        display_rule = display_rule[len("Rule: ") :]
+                    elif display_rule.startswith("Preference: "):
+                        display_rule = display_rule[len("Preference: ") :]
+                    display_rule
+                with button_col:
+                    if st.button(
+                        "Delete",
+                        key=f"delete_rule_{i}_{rule}",
+                        help=f"Delete rule: '{rule}'",
+                    ):
+                        st.toast(f"Rule '{rule}' deleted.")
+                    else:
+                        rules_to_keep.append(rule)
             else:
                 break
         if len(rules_to_keep) != len(st.session_state.rules):
