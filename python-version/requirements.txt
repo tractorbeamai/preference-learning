@@ -1,4 +1,0 @@
-streamlit
-openai
-watchdog
-streamlit-extras
