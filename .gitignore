@@ -1,2 +1,5 @@
 node_modules/
 .venv/
+# Env files
+.env*
+.vercel
