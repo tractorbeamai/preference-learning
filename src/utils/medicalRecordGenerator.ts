@@ -64,64 +64,168 @@ const AP_PHRASES = [
 
 const PLACEHOLDERS: Record<string, () => string> = {
   "{age}": () => String(Math.floor(Math.random() * 60) + 20),
-  "{sex}": () => Math.random() > 0.5 ? "male" : "female",
-  "{duration}": () => ["2 days", "1 week", "3 hours", "several months"][Math.floor(Math.random() * 4)],
-  "{progression}": () => ["worsening", "improving", "stable", "intermittent"][Math.floor(Math.random() * 4)],
-  "{quality}": () => ["sharp", "dull", "aching", "burning", "pressure-like"][Math.floor(Math.random() * 5)],
-  "{location}": () => ["left lower quadrant", "substernal area", "right flank", "occipital region", "epigastrium"][Math.floor(Math.random() * 5)],
-  "{exacerbating_factors}": () => ["movement", "deep breaths", "eating", "stress"][Math.floor(Math.random() * 4)],
-  "{relieving_factors}": () => ["rest", "medication", "position change", "nothing"][Math.floor(Math.random() * 4)],
+  "{sex}": () => (Math.random() > 0.5 ? "male" : "female"),
+  "{duration}": () =>
+    ["2 days", "1 week", "3 hours", "several months"][
+      Math.floor(Math.random() * 4)
+    ],
+  "{progression}": () =>
+    ["worsening", "improving", "stable", "intermittent"][
+      Math.floor(Math.random() * 4)
+    ],
+  "{quality}": () =>
+    ["sharp", "dull", "aching", "burning", "pressure-like"][
+      Math.floor(Math.random() * 5)
+    ],
+  "{location}": () =>
+    [
+      "left lower quadrant",
+      "substernal area",
+      "right flank",
+      "occipital region",
+      "epigastrium",
+    ][Math.floor(Math.random() * 5)],
+  "{exacerbating_factors}": () =>
+    ["movement", "deep breaths", "eating", "stress"][
+      Math.floor(Math.random() * 4)
+    ],
+  "{relieving_factors}": () =>
+    ["rest", "medication", "position change", "nothing"][
+      Math.floor(Math.random() * 4)
+    ],
   "{associated_symptoms}": () => {
-    const symptoms = ["fever", "chills", "sweats", "shortness of breath", "dizziness", "nausea"];
+    const symptoms = [
+      "fever",
+      "chills",
+      "sweats",
+      "shortness of breath",
+      "dizziness",
+      "nausea",
+    ];
     const count = Math.floor(Math.random() * 3) + 1;
     const selected = symptoms.sort(() => 0.5 - Math.random()).slice(0, count);
     return selected.join(", ");
   },
   "{denied_symptoms}": () => {
-    const symptoms = ["chest pain", "cough", "headache", "vision changes", "weakness"];
+    const symptoms = [
+      "chest pain",
+      "cough",
+      "headache",
+      "vision changes",
+      "weakness",
+    ];
     const count = Math.floor(Math.random() * 3) + 1;
     const selected = symptoms.sort(() => 0.5 - Math.random()).slice(0, count);
     return selected.join(", ");
   },
   "{severity}": () => String(Math.floor(Math.random() * 7) + 3),
   "{conditions}": () => {
-    const conditions = ["hypertension", "diabetes mellitus type 2", "asthma", "hyperlipidemia", "GERD"];
+    const conditions = [
+      "hypertension",
+      "diabetes mellitus type 2",
+      "asthma",
+      "hyperlipidemia",
+      "GERD",
+    ];
     const count = Math.floor(Math.random() * 3) + 1;
     const selected = conditions.sort(() => 0.5 - Math.random()).slice(0, count);
     return selected.join(", ");
   },
-  "{surgeries}": () => ["appendectomy in childhood", "cholecystectomy 5 years ago", "knee arthroscopy", "none"][Math.floor(Math.random() * 4)],
-  "{family_conditions}": () => ["heart disease", "cancer", "diabetes"][Math.floor(Math.random() * 3)],
-  "{relative}": () => ["mother", "father", "sibling"][Math.floor(Math.random() * 3)],
-  "{social_factors}": () => ["history of smoking (quit 5 years ago)", "occasional alcohol use", "denies illicit drug use", "lives alone"][Math.floor(Math.random() * 4)],
+  "{surgeries}": () =>
+    [
+      "appendectomy in childhood",
+      "cholecystectomy 5 years ago",
+      "knee arthroscopy",
+      "none",
+    ][Math.floor(Math.random() * 4)],
+  "{family_conditions}": () =>
+    ["heart disease", "cancer", "diabetes"][Math.floor(Math.random() * 3)],
+  "{relative}": () =>
+    ["mother", "father", "sibling"][Math.floor(Math.random() * 3)],
+  "{social_factors}": () =>
+    [
+      "history of smoking (quit 5 years ago)",
+      "occasional alcohol use",
+      "denies illicit drug use",
+      "lives alone",
+    ][Math.floor(Math.random() * 4)],
   "{medications}": () => {
-    const meds = ["Lisinopril 10mg", "Metformin 500mg BID", "Albuterol inhaler PRN", "Atorvastatin 20mg"];
+    const meds = [
+      "Lisinopril 10mg",
+      "Metformin 500mg BID",
+      "Albuterol inhaler PRN",
+      "Atorvastatin 20mg",
+    ];
     const count = Math.floor(Math.random() * 3) + 1;
     const selected = meds.sort(() => 0.5 - Math.random()).slice(0, count);
     return selected.join(", ");
   },
-  "{allergies}": () => ["penicillin (rash)", "NKDA", "seasonal allergies", "shellfish"][Math.floor(Math.random() * 4)],
-  "{bp}": () => `${Math.floor(Math.random() * 50) + 110}/${Math.floor(Math.random() * 25) + 70}`,
+  "{allergies}": () =>
+    ["penicillin (rash)", "NKDA", "seasonal allergies", "shellfish"][
+      Math.floor(Math.random() * 4)
+    ],
+  "{bp}": () =>
+    `${Math.floor(Math.random() * 50) + 110}/${Math.floor(Math.random() * 25) + 70}`,
   "{hr}": () => String(Math.floor(Math.random() * 40) + 60),
   "{rr}": () => String(Math.floor(Math.random() * 6) + 14),
   "{temp}": () => (Math.random() * 4 + 97.5).toFixed(1),
   "{spo2}": () => String(Math.floor(Math.random() * 6) + 94),
   "{diagnosis_list}": () => {
-    const diagnoses = ["Acute bronchitis", "Gastritis", "Migraine headache", "Lumbar strain", "Community-acquired pneumonia"];
+    const diagnoses = [
+      "Acute bronchitis",
+      "Gastritis",
+      "Migraine headache",
+      "Lumbar strain",
+      "Community-acquired pneumonia",
+    ];
     const count = Math.floor(Math.random() * 3) + 1;
     const selected = diagnoses.sort(() => 0.5 - Math.random()).slice(0, count);
     return selected.join(", ");
   },
-  "{service}": () => ["Medicine", "Observation", "Surgery"][Math.floor(Math.random() * 3)],
-  "{follow_up}": () => ["rest and hydration", "return precautions", "taking medications as prescribed"][Math.floor(Math.random() * 3)],
-  "{labs_imaging}": () => ["CBC, CMP, Troponin", "Chest X-ray", "CT abdomen/pelvis", "Urinalysis", "EKG"][Math.floor(Math.random() * 5)],
-  "{specialty}": () => ["Cardiology", "GI", "Neurology", "Pulmonology"][Math.floor(Math.random() * 4)],
-  "{medication_treatment}": () => ["IV fluids", "antibiotics", "pain control regimen", "nebulizer treatments"][Math.floor(Math.random() * 4)],
-  "{symptomatic_treatment}": () => ["antiemetics", "analgesics", "cough suppressants"][Math.floor(Math.random() * 3)],
-  "{education_topic}": () => ["medication side effects", "warning signs", "dietary changes"][Math.floor(Math.random() * 3)],
-  "{fup_time}": () => ["2-3 days", "1 week", "as needed"][Math.floor(Math.random() * 3)],
+  "{service}": () =>
+    ["Medicine", "Observation", "Surgery"][Math.floor(Math.random() * 3)],
+  "{follow_up}": () =>
+    [
+      "rest and hydration",
+      "return precautions",
+      "taking medications as prescribed",
+    ][Math.floor(Math.random() * 3)],
+  "{labs_imaging}": () =>
+    [
+      "CBC, CMP, Troponin",
+      "Chest X-ray",
+      "CT abdomen/pelvis",
+      "Urinalysis",
+      "EKG",
+    ][Math.floor(Math.random() * 5)],
+  "{specialty}": () =>
+    ["Cardiology", "GI", "Neurology", "Pulmonology"][
+      Math.floor(Math.random() * 4)
+    ],
+  "{medication_treatment}": () =>
+    [
+      "IV fluids",
+      "antibiotics",
+      "pain control regimen",
+      "nebulizer treatments",
+    ][Math.floor(Math.random() * 4)],
+  "{symptomatic_treatment}": () =>
+    ["antiemetics", "analgesics", "cough suppressants"][
+      Math.floor(Math.random() * 3)
+    ],
+  "{education_topic}": () =>
+    ["medication side effects", "warning signs", "dietary changes"][
+      Math.floor(Math.random() * 3)
+    ],
+  "{fup_time}": () =>
+    ["2-3 days", "1 week", "as needed"][Math.floor(Math.random() * 3)],
   "{diff_dx}": () => {
-    const diffs = ["Pulmonary embolism", "Myocardial infarction", "Appendicitis", "Cholecystitis"];
+    const diffs = [
+      "Pulmonary embolism",
+      "Myocardial infarction",
+      "Appendicitis",
+      "Cholecystitis",
+    ];
     const count = Math.floor(Math.random() * 2) + 1;
     const selected = diffs.sort(() => 0.5 - Math.random()).slice(0, count);
     return selected.join(", ");
@@ -147,13 +251,14 @@ function generateSection(phrases: string[], numSentences: number): string {
 export function generateFakeMedicalRecord(wordCount: number = 1000): string {
   const targetSentences = Math.floor(wordCount / 15);
   const hpiSentences = Math.max(5, Math.floor(targetSentences * 0.25));
-  const pmhSentences = Math.max(4, Math.floor(targetSentences * 0.20));
+  const pmhSentences = Math.max(4, Math.floor(targetSentences * 0.2));
   const examSentences = Math.max(8, Math.floor(targetSentences * 0.25));
-  const apSentences = Math.max(5, Math.floor(targetSentences * 0.30));
+  const apSentences = Math.max(5, Math.floor(targetSentences * 0.3));
 
   const patientName = `John Doe ${String.fromCharCode(65 + Math.floor(Math.random() * 26))}`;
-  const dob = `19${Math.floor(Math.random() * 40) + 50}-${String(Math.floor(Math.random() * 12) + 1).padStart(2, '0')}-${String(Math.floor(Math.random() * 28) + 1).padStart(2, '0')}`;
-  const chiefComplaint = CHIEF_COMPLAINTS[Math.floor(Math.random() * CHIEF_COMPLAINTS.length)];
+  const dob = `19${Math.floor(Math.random() * 40) + 50}-${String(Math.floor(Math.random() * 12) + 1).padStart(2, "0")}-${String(Math.floor(Math.random() * 28) + 1).padStart(2, "0")}`;
+  const chiefComplaint =
+    CHIEF_COMPLAINTS[Math.floor(Math.random() * CHIEF_COMPLAINTS.length)];
 
   let record = `## Patient Record: ${Math.floor(Math.random() * 9000) + 1000}\n\n`;
   record += "**Date:** 2025-04-15\n";
@@ -164,7 +269,7 @@ export function generateFakeMedicalRecord(wordCount: number = 1000): string {
   record += "**History of Present Illness:**\n";
   let hpiSection = fillPlaceholders(HPI_PHRASES[0]) + ` ${chiefComplaint}. `;
   hpiSection += generateSection(HPI_PHRASES.slice(1), hpiSentences - 1);
-  
+
   while (hpiSection.split(" ").length < hpiSentences * 10) {
     hpiSection += " " + generateSection(HPI_PHRASES.slice(1), 2);
   }
@@ -178,15 +283,18 @@ export function generateFakeMedicalRecord(wordCount: number = 1000): string {
   record += pmhSection.trim() + ".\n\n";
 
   record += "**Physical Examination:**\n";
-  const examSectionList = EXAM_FINDINGS
-    .sort(() => 0.5 - Math.random())
+  const examSectionList = EXAM_FINDINGS.sort(() => 0.5 - Math.random())
     .slice(0, Math.min(examSentences, EXAM_FINDINGS.length))
     .map(fillPlaceholders);
-  
+
   while (examSectionList.length < examSentences) {
-    examSectionList.push(fillPlaceholders(EXAM_FINDINGS[Math.floor(Math.random() * EXAM_FINDINGS.length)]));
+    examSectionList.push(
+      fillPlaceholders(
+        EXAM_FINDINGS[Math.floor(Math.random() * EXAM_FINDINGS.length)],
+      ),
+    );
   }
-  record += examSectionList.map(line => `- ${line}`).join("\n") + "\n\n";
+  record += examSectionList.map((line) => `- ${line}`).join("\n") + "\n\n";
 
   record += "**Assessment and Plan:**\n";
   let apSection = generateSection(AP_PHRASES, apSentences);
@@ -199,7 +307,9 @@ export function generateFakeMedicalRecord(wordCount: number = 1000): string {
   if (currentWords < wordCount * 0.8) {
     const paddingNeeded = wordCount - currentWords;
     const paddingSentences = Math.floor(paddingNeeded / 15);
-    record += "\n\n**Additional Notes:**\n" + generateSection([...HPI_PHRASES, ...AP_PHRASES], paddingSentences);
+    record +=
+      "\n\n**Additional Notes:**\n" +
+      generateSection([...HPI_PHRASES, ...AP_PHRASES], paddingSentences);
   } else if (currentWords > wordCount * 1.2) {
     const words = record.split(" ");
     record = words.slice(0, Math.floor(wordCount * 1.1)).join(" ");

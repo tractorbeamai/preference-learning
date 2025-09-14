@@ -1,5 +1,11 @@
+# dependencies
 node_modules/
-.venv/
-# Env files
-.env*
+
+# local files
+*.local
+
+# build files
 .vercel
+.output
+.nitro
+.tanstack

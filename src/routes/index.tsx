@@ -1,12 +1,7 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { useState, useEffect } from "react";
-import { generateFakeMedicalRecord } from "../utils/medicalRecordGenerator";
-import { generateSummary, analyzePreferences } from "../server/openai";
-import { LEARNING_RATE_THRESHOLDS, LearningRate } from "../utils/types";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
   SelectContent,
@@ -14,8 +9,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { AlertCircle, CheckCircle } from "lucide-react";
-import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Textarea } from "@/components/ui/textarea";
+import { createFileRoute } from "@tanstack/react-router";
+import { AlertCircle, CheckCircle, Loader2 } from "lucide-react";
+import { useEffect, useState } from "react";
+import { analyzePreferences } from "../server/analyzePreferences";
+import { generateSummary } from "../server/generateSummary";
+import { generateFakeMedicalRecord } from "../utils/medicalRecordGenerator";
+import { LEARNING_RATE_THRESHOLDS, LearningRate } from "../utils/types";
 
 export const Route = createFileRoute("/")({
   component: App,
@@ -74,7 +75,7 @@ function App() {
     setSuccess(null);
 
     try {
-      const summary = await generateSummary({
+      const { summary } = await generateSummary({
         data: {
           record: state.fakeRecord,
           rules: state.rules,
@@ -89,7 +90,7 @@ function App() {
       setSuccess("Summary generated successfully!");
     } catch (err) {
       setError(
-        err instanceof Error ? err.message : "Failed to generate summary"
+        err instanceof Error ? err.message : "Failed to generate summary",
       );
     } finally {
       setIsSummarizing(false);
@@ -107,7 +108,7 @@ function App() {
     setSuccess(null);
 
     try {
-      const result = await analyzePreferences({
+      const result = (await analyzePreferences({
         data: {
           initialSummary: state.initialSummary,
           editedSummary: state.editedSummary,
@@ -116,9 +117,12 @@ function App() {
           currentObservations: state.observations,
           learningRate: state.learningRate,
         },
-      });
+      })) as {
+        rules: string[];
+        observations: { observation: string; count: number }[];
+      };
 
-      const promotedCount = result.rules.length - state.rules.length;
+      const promotedCount = (result.rules?.length ?? 0) - state.rules.length;
       const newState = { ...state, ...result };
 
       setState(newState);
@@ -131,7 +135,7 @@ function App() {
       setSuccess(message);
     } catch (err) {
       setError(
-        err instanceof Error ? err.message : "Failed to analyze preferences"
+        err instanceof Error ? err.message : "Failed to analyze preferences",
       );
     } finally {
       setIsAnalyzing(false);
@@ -147,10 +151,7 @@ function App() {
   };
 
   const Spinner = () => (
-    <span
-      className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent align-middle"
-      aria-label="Loading"
-    />
+    <Loader2 className="h-4 w-4 animate-spin" aria-label="Loading" />
   );
 
   const threshold = LEARNING_RATE_THRESHOLDS[state.learningRate];
