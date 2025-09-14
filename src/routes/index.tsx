@@ -2,29 +2,35 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useState, useEffect } from "react";
 import { generateFakeMedicalRecord } from "../utils/medicalRecordGenerator";
 import { generateSummary, analyzePreferences } from "../server/openai";
-import { PreferenceLearningState, LEARNING_RATE_THRESHOLDS } from "../types";
-import { Button } from "../components/ui/button";
-import { Input } from "../components/ui/input";
-import { Label } from "../components/ui/label";
-import { Textarea } from "../components/ui/textarea";
+import { LEARNING_RATE_THRESHOLDS, LearningRate } from "../utils/types";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "../components/ui/select";
-import { Badge } from "../components/ui/badge";
-import { AlertCircle, CheckCircle, ChevronRight } from "lucide-react";
-import { Alert, AlertDescription } from "../components/ui/alert";
+} from "@/components/ui/select";
+import { AlertCircle, CheckCircle } from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 export const Route = createFileRoute("/")({
-  component: PreferenceLearningApp,
+  component: App,
 });
 
-function PreferenceLearningApp() {
-  const [state, setState] = useState<PreferenceLearningState>({
-    rules: ["Rule: Be concise.", "Rule: Focus on actionable items."],
+function App() {
+  const [state, setState] = useState<{
+    rules: string[];
+    observations: { observation: string; count: number }[];
+    fakeRecord: string;
+    initialSummary: string;
+    editedSummary: string;
+    learningRate: LearningRate;
+  }>({
+    rules: ["Be concise.", "Focus on actionable items."],
     observations: [],
     fakeRecord: "",
     initialSummary: "",

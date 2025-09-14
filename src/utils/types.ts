@@ -1,6 +1,6 @@
 export type LearningRate = "Slow" | "Normal" | "Fast";
 
-export interface PreferenceLearningState {
+export interface AppState {
   rules: string[];
   observations: { observation: string; count: number }[];
   fakeRecord: string;
