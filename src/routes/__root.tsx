@@ -54,7 +54,7 @@ function RootComponent() {
 
 function RootDocument({ children }: Readonly<{ children: ReactNode }>) {
   return (
-    <html lang="en" className="antialiased font-sans">
+    <html lang="en" className="font-sans antialiased">
       <head>
         <HeadContent />
       </head>
