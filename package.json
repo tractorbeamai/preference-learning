@@ -13,8 +13,7 @@
     "dev": "vite",
     "format": "prettier --write .",
     "lint:format": "prettier --check .",
-    "lint:types": "tsc --noEmit",
-    "preview": "vite preview"
+    "lint:types": "tsc --noEmit"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^2.0.17",
