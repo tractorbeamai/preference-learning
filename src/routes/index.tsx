@@ -1,22 +1,26 @@
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { createFileRoute } from "@tanstack/react-router";
-import { AlertCircle, CheckCircle, Loader2 } from "lucide-react";
+import { env } from "@/env/client";
+import { cn } from "@/lib/utils";
+import { createFileRoute, Link } from "@tanstack/react-router";
+import {
+  AlertCircle,
+  CheckCircle,
+  FileText,
+  Loader2,
+  Minus,
+  Pencil,
+  Plus,
+  RefreshCcw,
+  RotateCcw,
+  Sparkles,
+} from "lucide-react";
 import { useEffect, useState } from "react";
 import { analyzePreferences } from "../server/analyzePreferences";
+import { generateMedicalRecord } from "../server/generateMedicalRecord";
 import { generateSummary } from "../server/generateSummary";
-import { generateFakeMedicalRecord } from "../utils/medicalRecordGenerator";
-import { LEARNING_RATE_THRESHOLDS, LearningRate } from "../utils/types";
 
 export const Route = createFileRoute("/")({
   component: App,
@@ -29,40 +33,45 @@ function App() {
     fakeRecord: string;
     initialSummary: string;
     editedSummary: string;
-    learningRate: LearningRate;
   }>({
     rules: ["Be concise.", "Focus on actionable items."],
     observations: [],
     fakeRecord: "",
     initialSummary: "",
     editedSummary: "",
-    learningRate: "Normal",
   });
 
-  const [directPreference, setDirectPreference] = useState("");
+  const [newRule, setNewRule] = useState("");
   const [isSummarizing, setIsSummarizing] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
-  useEffect(() => {
-    setState((prev) => ({
-      ...prev,
-      fakeRecord: generateFakeMedicalRecord(),
-    }));
-  }, []);
-
-  const handleRegenerateRecord = () => {
+  const generate = async () => {
     if (isSummarizing || isAnalyzing) return;
-    setState((prev) => ({
-      ...prev,
-      fakeRecord: generateFakeMedicalRecord(),
-      initialSummary: "",
-      editedSummary: "",
-    }));
     setError(null);
     setSuccess(null);
+    try {
+      const { record } = await generateMedicalRecord();
+      setState((prev) => ({
+        ...prev,
+        fakeRecord: record,
+        initialSummary: "",
+        editedSummary: "",
+      }));
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "Failed to generate record",
+      );
+    }
   };
+
+  useEffect(() => {
+    generate();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Regenerate uses the same generate() function
 
   const handleSummarize = async () => {
     if (!state.fakeRecord) {
@@ -112,10 +121,8 @@ function App() {
         data: {
           initialSummary: state.initialSummary,
           editedSummary: state.editedSummary,
-          directPreference,
           currentRules: state.rules,
           currentObservations: state.observations,
-          learningRate: state.learningRate,
         },
       })) as {
         rules: string[];
@@ -126,7 +133,6 @@ function App() {
       const newState = { ...state, ...result };
 
       setState(newState);
-      setDirectPreference("");
 
       const message =
         promotedCount > 0
@@ -150,50 +156,88 @@ function App() {
     }));
   };
 
+  const handleAddRule = () => {
+    if (!newRule.trim()) return;
+    if (state.rules.includes(newRule.trim())) {
+      setError("Rule already exists");
+      return;
+    }
+    setState((prev) => ({
+      ...prev,
+      rules: [...prev.rules, newRule.trim()],
+    }));
+    setNewRule("");
+    setSuccess("Rule added successfully");
+  };
+
   const Spinner = () => (
     <Loader2 className="h-4 w-4 animate-spin" aria-label="Loading" />
   );
 
-  const threshold = LEARNING_RATE_THRESHOLDS[state.learningRate];
-
   return (
     <div className="min-h-screen bg-white p-6">
       <div className="max-w-7xl mx-auto space-y-6">
-        <div className="border-b pb-4">
-          <h1 className="text-2xl font-semibold text-gray-900">
-            Tractorbeam: Preference Learning Prototype
+        <div className="pb-4">
+          <p className="md:text-sm font-medium">
+            Created bv{" "}
+            <a
+              href="https://tractorbeam.ai"
+              className="text-primaryfont-semibold hover:text-primary/70 transition-colors"
+              target="_blank"
+            >
+              Tractorbeam
+            </a>{" "}
+            for{" "}
+            <a
+              href="https://tempus.ai"
+              className="text-primary font-semibold hover:text-primary/70 transition-colors"
+              target="_blank"
+            >
+              Tempus AI
+            </a>
+          </p>
+          <h1 className="text-2xl font-semibold">
+            Preference Learning Prototype
           </h1>
-          <p className="text-sm text-gray-600 mt-2">
+          <p className="text-sm md:text-xs text-muted-foreground mt-2">
             Learning summarization preferences from text deltas and explicit
             rules
           </p>
         </div>
 
+        <hr className="border-border -mt-3 -mx-6" />
+
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           <div className="lg:col-span-2 space-y-6">
             {/* Input */}
-            <div>
+            <div className="space-y-3">
               <div className="flex items-center justify-between mb-2">
-                <h2 className="text-sm font-medium text-gray-700 uppercase tracking-wide">
-                  Input: Medical Record
+                <h2 className="text-base md:text-sm font-medium uppercase tracking-wide">
+                  Medical Record
                 </h2>
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={handleRegenerateRecord}
-                  className="text-xs"
+                  onClick={generate}
+                  className="text-xs border shadow-none rounded cursor-pointer"
                   disabled={isSummarizing || isAnalyzing}
                 >
+                  <RefreshCcw className="size-3" />
                   Regenerate
                 </Button>
               </div>
+              <p className="text-sm md:text-xs text-muted-foreground">
+                This is a demo medical record for our summarizer tool, which
+                improves by observing user edits.
+              </p>
               <Textarea
                 value={state.fakeRecord}
                 readOnly
-                className="max-h-[350px] min-h-[250px] overflow-y-auto font-mono text-xs border-gray-300 bg-gray-50"
+                className="h-64 overflow-y-auto resize-none shadow-none rounded"
               />
               <Button
-                className="mt-3 w-full"
+                className="w-full border shadow-none rounded cursor-pointer"
+                variant="secondary"
                 onClick={handleSummarize}
                 disabled={isSummarizing || isAnalyzing}
               >
@@ -202,16 +246,16 @@ function App() {
             </div>
 
             {/* Summary with Edit */}
-            <div>
-              <h2 className="text-sm font-medium text-gray-700 uppercase tracking-wide mb-2">
-                Output: Summary (Editable)
+            <div className="space-y-3">
+              <h2 className="text-base md:text-sm font-medium uppercase tracking-wide">
+                AI-Generated Summary{" "}
+                <span className="text-muted-foreground">(Editable)</span>
               </h2>
-              {state.initialSummary && (
-                <p className="text-xs text-gray-500 mb-2">
-                  Edit the summary below. Text deltas will be analyzed for
-                  patterns.
-                </p>
-              )}
+              <p className="text-sm md:text-xs text-muted-foreground">
+                This AI-generated summary is a demo output. Edit it, like
+                removing the patient's age, to help the agent learn your
+                preferences for future summaries.
+              </p>
               <Textarea
                 value={state.editedSummary}
                 onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) =>
@@ -221,135 +265,136 @@ function App() {
                   }))
                 }
                 placeholder="Generated summary will appear here..."
-                className="min-h-[100px] font-sans text-sm border-gray-300"
+                className="h-40 resize-none shadow-none rounded border"
               />
             </div>
 
-            {/* Direct Preference */}
-            <div>
-              <h2 className="text-sm font-medium text-gray-700 uppercase tracking-wide mb-2">
-                Direct Preference (Optional)
-              </h2>
-              <p className="text-xs text-gray-500 mb-2">
-                Explicit rules e.g., "Always include patient demographics" or
-                "Use bullet points"
-              </p>
-              <Input
-                value={directPreference}
-                onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                  setDirectPreference(e.target.value)
-                }
-                placeholder="Enter preference..."
-                className="border-gray-300"
-              />
-              <Button
-                className="mt-3 w-full"
-                onClick={handleSavePreferences}
-                disabled={isAnalyzing || isSummarizing || !state.initialSummary}
-              >
-                {isAnalyzing ? <Spinner /> : "Submit Changes"}
-              </Button>
-            </div>
+            {/* Submit Changes */}
+            <Button
+              className="w-full border shadow-none rounded cursor-pointer"
+              variant="secondary"
+              onClick={handleSavePreferences}
+              disabled={isAnalyzing || isSummarizing || !state.initialSummary}
+            >
+              {isAnalyzing ? <Spinner /> : "Analyze Changes"}
+            </Button>
 
             {error && (
-              <Alert variant="destructive">
+              <Alert
+                variant="destructive"
+                className="border shadow-none rounded"
+              >
                 <AlertCircle className="h-4 w-4" />
                 <AlertDescription>{error}</AlertDescription>
               </Alert>
             )}
 
             {success && (
-              <Alert className="border-gray-300 bg-gray-50">
-                <CheckCircle className="h-4 w-4 text-gray-600" />
-                <AlertDescription className="text-gray-800">
-                  {success}
-                </AlertDescription>
+              <Alert className="bg-muted text-muted-foreground border shadow-none rounded">
+                <CheckCircle className="h-4 w-4" />
+                <AlertDescription>{success}</AlertDescription>
               </Alert>
             )}
           </div>
 
-          <div className="space-y-6">
-            {/* Configuration */}
-            <div>
-              <h2 className="text-sm font-medium text-gray-700 uppercase tracking-wide mb-3">
-                Configuration
-              </h2>
-              <div className="space-y-3">
-                <div>
-                  <Label htmlFor="learning-rate" className="text-xs">
-                    Learning Rate
-                  </Label>
-                  <Select
-                    value={state.learningRate}
-                    onValueChange={(value: "Slow" | "Normal" | "Fast") =>
-                      setState((prev) => ({ ...prev, learningRate: value }))
-                    }
-                  >
-                    <SelectTrigger
-                      id="learning-rate"
-                      className="border-gray-300 text-sm mt-1"
-                    >
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="Slow">Slow (5)</SelectItem>
-                      <SelectItem value="Normal">Normal (3)</SelectItem>
-                      <SelectItem value="Fast">Fast (2)</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-            </div>
+          <hr className="border-border -mx-6 lg:hidden" />
 
+          <div className="space-y-6">
             {/* Rules */}
-            <div>
-              <h2 className="text-sm font-medium text-gray-700 uppercase tracking-wide mb-2">
-                Rules (n ≥ {threshold})
+            <div className="space-y-3">
+              <h2 className="text-base md:text-sm font-medium uppercase tracking-wide">
+                Rules
               </h2>
+              <p className="text-sm md:text-xs text-muted-foreground">
+                Rules are generated from observations that have been seen{" "}
+                {env.VITE_PROMOTION_THRESHOLD} times.
+              </p>
+
               {state.rules.length === 0 ? (
-                <p className="text-xs text-gray-500">No rules learned yet</p>
+                <p className="text-sm md:text-xs text-muted-foreground">
+                  No rules learned yet
+                </p>
               ) : (
-                <div className="space-y-1">
+                <div className="space-y-2">
                   {state.rules.map((rule, index) => (
                     <div
                       key={index}
-                      className="flex items-center justify-between p-2 bg-gray-50 rounded text-xs"
+                      className="flex items-center justify-between p-2 bg-muted rounded text-sm md:text-xs border border-border"
                     >
-                      <span className="flex-1 text-gray-700">{rule}</span>
+                      <span className="flex-1">{rule}</span>
                       <button
                         onClick={() => handleDeleteRule(index)}
-                        className="ml-2 text-gray-600 hover:text-red-600 disabled:opacity-50"
+                        className="ml-2 font-medium text-muted-foreground hover:text-destructive disabled:opacity-50 cursor-pointer"
                         disabled={isSummarizing || isAnalyzing}
                       >
-                        Delete
+                        <Minus className="size-3 mr-0.5" />
                       </button>
                     </div>
                   ))}
+                  {/* Add Rule Input */}
+                  <div className="relative flex space-x-2">
+                    <Input
+                      value={newRule}
+                      onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                        setNewRule(e.target.value)
+                      }
+                      placeholder="Add a rule manually..."
+                      className="text-sm! md:h-8 rounded px-2 placeholder:text-sm md:placeholder:text-xs md:text-xs! shadow-none"
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          handleAddRule();
+                        }
+                      }}
+                    />
+                    <Button
+                      variant="secondary"
+                      className="size-9 md:size-8 rounded border border-input hover:bg-accent text-xs shadow-none cursor-pointer disabled:cursor-not-allowed"
+                      onClick={handleAddRule}
+                      disabled={!newRule.trim() || isSummarizing || isAnalyzing}
+                    >
+                      <Plus className="size-3" />
+                    </Button>
+                  </div>
                 </div>
               )}
             </div>
 
             {/* Observations */}
             <div>
-              <h2 className="text-sm font-medium text-gray-700 uppercase tracking-wide mb-2">
-                Observations (n &lt; {threshold})
+              <h2 className="text-base md:text-sm font-medium uppercase tracking-wide mb-2">
+                Observations
               </h2>
               {Object.keys(state.observations).length === 0 ? (
-                <p className="text-xs text-gray-500">
-                  No observations recorded
+                <p className="text-sm md:text-xs text-muted-foreground opacity-50">
+                  No observations recorded yet
                 </p>
               ) : (
-                <div className="space-y-1">
+                <div className="space-y-2">
                   {state.observations
                     .sort((a, b) => b.count - a.count)
                     .map(({ observation, count }) => (
-                      <div key={observation} className="p-2 bg-gray-50 rounded">
+                      <div
+                        key={observation}
+                        className="p-2 bg-muted rounded border border-border"
+                      >
                         <div className="flex items-center gap-2">
-                          <span className="text-xs font-mono text-gray-500">
-                            [{count}/{threshold}]
-                          </span>
-                          <span className="text-xs text-gray-700 flex-1">
+                          <span className="text-sm md:text-xs flex-1">
                             {observation}
+                          </span>
+                          <span className="flex items-center gap-1">
+                            {Array.from({
+                              length: env.VITE_PROMOTION_THRESHOLD,
+                            }).map((_, i) => (
+                              <div
+                                key={i}
+                                className={cn(
+                                  "h-4 w-2 rounded-[2px] border inline-block transition-colors",
+                                  i < count
+                                    ? "bg-stone-200 border-stone-300"
+                                    : "bg-transparent border-stone-200",
+                                )}
+                              ></div>
+                            ))}
                           </span>
                         </div>
                       </div>

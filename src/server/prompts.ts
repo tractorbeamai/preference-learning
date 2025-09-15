@@ -1,30 +1,67 @@
 export function summaryPrompt(rules: string[], medical_record: string) {
   return `
-  Please summarize the following fake medical record in exactly 3-4 concise sentences.
-  Always include demographic information about the patient in your summary.
-  Ensure your summary is useful for a fast-moving, busy clinical setting.
+  Your task is to create a comprehensive medical record summary that demonstrates understanding of patient preferences and communication styles.
   
-  <rules>${rules.join("\n - ")}</rules>
-  <medical_record>${medical_record}</medical_record>
+  Generate a summary of exactly 3-4 concise, well-structured sentences that captures the key medical information from the provided record.
   
-  ALWAYS follow the rules/preferences flawlessly when generating the summary.
+  <context>
+  This is a demonstration of preference learning in an AI product. The medical record is synthetically generated for testing purposes.
+  Your summary will be evaluated on how well it follows the user's established preferences, not on medical accuracy.
+  The synthetic records may contain logical inconsistencies - treat all information as valid for this demonstration.
+  </context>
   
-  3-4 sentences summary:
+  <user_preferences>
+  Apply each of these preferences meticulously when crafting your summary:
+  ${rules.map(rule => `- ${rule}`).join("\n  ")}
+  </user_preferences>
+  
+  <medical_record>
+  ${medical_record}
+  </medical_record>
+  
+  <output_format>
+  Write your summary in exactly 3-4 complete sentences using smoothly flowing prose.
+  Each sentence should convey distinct, meaningful information about the patient.
+  Apply all user preferences naturally within your narrative summary.
+  </output_format>
+  
+  Summary:
   `;
 }
 
 export function rulesPrompt(observation: string, currentRules: string[]) {
   return `
-  We are learning a user's preferences for summarizing text.
-  Rewrite the following observation, which the user has established as a preference, into an imperative rule that can be used to instruct future LLM summarizations.
-  If a very similar rule already exists, you should output the existing rule perfectly, word-for-word.
+  Your task is to convert user preference observations into actionable, consistent rules for text summarization.
   
-  <observation>${observation}</observation>
+  <context>
+  You are part of a preference learning system that captures and standardizes user preferences.
+  Consistency is crucial - when users express similar preferences, they should map to the same rule.
+  This ensures the system learns efficiently and avoids redundant or conflicting rules.
+  </context>
+  
+  <observation_to_convert>
+  ${observation}
+  </observation_to_convert>
+  
   <existing_rules>
-  ${currentRules.join("\n - ")}
+  Review these established rules carefully. If the observation matches an existing rule's intent, return that rule verbatim:
+  ${currentRules.map(rule => `- ${rule}`).join("\n  ")}
   </existing_rules>
   
-  Do not include any other text or commentary in your response.
+  <instructions>
+  Transform the observation into a clear, imperative rule that future LLMs can follow.
+  
+  Your rule should:
+  - Be written as a direct command (e.g., "Use medical abbreviations" not "The user prefers medical abbreviations")
+  - Be specific and actionable
+  - Match existing rules word-for-word if they express the same preference
+  - Be concise while maintaining clarity
+  </instructions>
+  
+  <output_format>
+  Provide only the rule text with no additional commentary, explanations, or formatting.
+  </output_format>
+  
   Rule:`;
 }
 
@@ -33,31 +70,53 @@ export function observationsPrompt(
   initialSummary: string,
   editedSummary: string,
   diff: string,
-  directPreference: string,
 ) {
   return `
-  As an expert system, analyze user feedback to uncover specific user preferences for text summarization.
-  Focus on the user's feedback, including summary modifications and direct preferences, in the context of their existing rules and observations.
-  Identify the user's unique preferences, even if unconventional, such as specific styles, formats, or abbreviations.
-  - For existing themes, use the exact canonical observation string from the <prior_observations_log> and increment the count by 1.
-  - If no new observations are identified, return the <prior_observations_log> unchanged.
-  - NEVER increment the count of an observation by more than 1. ONLY increment the count if the observation is semantically the same as the existing observation.
+  Your task is to analyze user feedback and extract specific preferences for text summarization, maintaining consistency with existing observations.
   
-  Call the submit_observations tool ONCE with the unified list of observations.
+  <context>
+  You are an expert preference learning system that identifies patterns in user behavior and feedback.
+  Users express preferences through both direct statements and indirect actions (like editing summaries).
+  Maintaining observation consistency is critical - similar preferences should map to the same observation.
+  Even unconventional preferences (unusual abbreviations, specific formats, unique styles) are valid and should be captured.
+  </context>
   
-  <prior_observations_log>
-  ${observationsLog}
-  </prior_observations_log>
-  <summary_before_important_user_edits>
-  ${initialSummary}
-  </summary_before_important_user_edits>
-  <summary_after_important_user_edits>
-  ${editedSummary}
-  </summary_after_important_user_edits>
-  <new_user_modifications>
-  ${diff}
-  </new_user_modifications>
-  <new_user_direct_preference>
-  ${directPreference}
-  </new_user_direct_preference>`;
+  <analysis_inputs>
+    <prior_observations_log>
+    ${observationsLog}
+    </prior_observations_log>
+    
+    <summary_before_important_user_edits>
+    ${initialSummary}
+    </summary_before_important_user_edits>
+    
+    <summary_after_important_user_edits>
+    ${editedSummary}
+    </summary_after_important_user_edits>
+    
+    <new_user_modifications>
+    ${diff}
+    </new_user_modifications>
+  </analysis_inputs>
+  
+  <instructions>
+  Analyze the user's modifications to identify preference patterns.
+  
+  Critical rules for observation management:
+  1. When you identify a preference that matches an existing observation semantically, use the EXACT canonical string from prior_observations_log and increment its count by exactly 1
+  2. Create new observations only for genuinely new preferences not covered by existing observations
+  3. Observations should be simple statements of preference without conditions (avoid "when X, do Y" or "if X, then Y")
+  4. Each observation can only have its count incremented by 1 per analysis
+  5. If no new preferences are identified, return the prior_observations_log exactly as provided
+  
+  Focus on extracting actionable preferences from:
+  - Specific changes the user made to the summary
+  - Patterns in how the user wants information presented
+  </instructions>
+  
+  <output_format>
+  Call the submit_observations tool exactly ONCE with your complete, unified list of observations.
+  Include both existing observations (with updated counts where applicable) and any new observations.
+  </output_format>
+  `;
 }

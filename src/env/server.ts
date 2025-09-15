@@ -5,6 +5,7 @@ export const env = createEnv({
   server: {
     ANTHROPIC_API_KEY: z.string().startsWith("sk-ant-"),
     ANTHROPIC_MODEL: z.string().default("claude-sonnet-4-20250514"),
+    PROMOTION_THRESHOLD: z.coerce.number().default(3),
   },
   runtimeEnv: process.env,
 });

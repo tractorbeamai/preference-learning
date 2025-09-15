@@ -1,3 +1,4 @@
+import { cn } from "@/lib/utils";
 import appCss from "@/styles/app.css?url";
 import {
   createRootRoute,
@@ -23,6 +24,19 @@ export const Route = createRootRoute({
     ],
     links: [
       {
+        rel: "preconnect",
+        href: "https://fonts.googleapis.com",
+      },
+      {
+        rel: "preconnect",
+        href: "https://fonts.gstatic.com",
+        crossOrigin: "anonymous",
+      },
+      {
+        rel: "stylesheet",
+        href: "https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&display=swap",
+      },
+      {
         rel: "stylesheet",
         href: appCss,
       },
@@ -41,7 +55,7 @@ function RootComponent() {
 
 function RootDocument({ children }: Readonly<{ children: ReactNode }>) {
   return (
-    <html>
+    <html lang="en" className="antialiased font-sans">
       <head>
         <HeadContent />
       </head>

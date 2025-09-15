@@ -1,5 +1,4 @@
 import { env } from "@/env/server";
-import { LEARNING_RATE_THRESHOLDS } from "@/utils/types";
 import { createAnthropic } from "@ai-sdk/anthropic";
 import { createServerFn } from "@tanstack/react-start";
 import { zodValidator } from "@tanstack/zod-adapter";
@@ -22,10 +21,8 @@ export const analyzePreferences = createServerFn({ method: "POST" })
       z.object({
         initialSummary: z.string(),
         editedSummary: z.string(),
-        directPreference: z.string(),
         currentRules: z.array(z.string()),
         currentObservations: z.array(Observation),
-        learningRate: z.enum(["Slow", "Normal", "Fast"]),
       }),
     ),
   )
@@ -34,10 +31,8 @@ export const analyzePreferences = createServerFn({ method: "POST" })
       data: {
         initialSummary,
         editedSummary,
-        directPreference,
         currentRules,
         currentObservations,
-        learningRate,
       },
     }) => {
       const observationsLog = currentObservations
@@ -60,7 +55,6 @@ export const analyzePreferences = createServerFn({ method: "POST" })
           initialSummary,
           editedSummary,
           diff,
-          directPreference,
         ),
         tools: {
           submit_observations: tool({
@@ -83,9 +77,8 @@ export const analyzePreferences = createServerFn({ method: "POST" })
         maxOutputTokens: 1024,
       });
 
-      const threshold = LEARNING_RATE_THRESHOLDS[learningRate];
       const eligibleObservations = newObservations.filter(
-        (o) => o.count >= threshold,
+        (o) => o.count >= env.PROMOTION_THRESHOLD,
       );
 
       const newRulesPromises = eligibleObservations.map(
