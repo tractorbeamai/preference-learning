@@ -78,7 +78,7 @@ export const analyzePreferences = createServerFn({ method: "POST" })
       });
 
       const eligibleObservations = newObservations.filter(
-        (o) => o.count >= env.PROMOTION_THRESHOLD,
+        (o) => o.count >= env.VITE_PROMOTION_THRESHOLD,
       );
 
       const newRulesPromises = eligibleObservations.map(
