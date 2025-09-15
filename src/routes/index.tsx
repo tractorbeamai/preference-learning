@@ -4,18 +4,14 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { env } from "@/env/client";
 import { cn } from "@/lib/utils";
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import {
   AlertCircle,
   CheckCircle,
-  FileText,
   Loader2,
   Minus,
-  Pencil,
   Plus,
   RefreshCcw,
-  RotateCcw,
-  Sparkles,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { analyzePreferences } from "../server/analyzePreferences";

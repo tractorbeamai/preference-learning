@@ -1,4 +1,3 @@
-import { cn } from "@/lib/utils";
 import appCss from "@/styles/app.css?url";
 import {
   createRootRoute,

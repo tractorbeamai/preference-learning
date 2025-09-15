@@ -12,7 +12,7 @@ export function summaryPrompt(rules: string[], medical_record: string) {
   
   <user_preferences>
   Apply each of these preferences meticulously when crafting your summary:
-  ${rules.map(rule => `- ${rule}`).join("\n  ")}
+  ${rules.map((rule) => `- ${rule}`).join("\n  ")}
   </user_preferences>
   
   <medical_record>
@@ -45,7 +45,7 @@ export function rulesPrompt(observation: string, currentRules: string[]) {
   
   <existing_rules>
   Review these established rules carefully. If the observation matches an existing rule's intent, return that rule verbatim:
-  ${currentRules.map(rule => `- ${rule}`).join("\n  ")}
+  ${currentRules.map((rule) => `- ${rule}`).join("\n  ")}
   </existing_rules>
   
   <instructions>

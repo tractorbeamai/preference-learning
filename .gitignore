@@ -9,3 +9,6 @@ node_modules/
 .output
 .nitro
 .tanstack
+
+# claude
+.claude
